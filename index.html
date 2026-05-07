@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Emergency Solver</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body {
+            text-align: center;
+            font-family: sans-serif;
+            padding: 50px;
+        }
+
+        #sos-btn {
+            background: red;
+            color: white;
+            padding: 40px;
+            font-size: 25px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        #alert-box {
+            display: none;
+            background: yellow;
+            padding: 20px;
+            margin-top: 20px;
+            border: 2px solid black;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Emergency Response Solver</h1>
+    <button id="sos-btn">SEND SOS</button>
+
+    <div id="alert-box" id="alert-box">
+        <h2>⚠️ EMERGENCY ALERT RECEIVED!</h2>
+        <p id="location-text"></p>
+    </div>
+
+    <script>
+        const socket = io();
+        const btn = document.getElementById('sos-btn');
+        const box = document.getElementById('alert-box');
+
+        socket.on('connect', () => {
+            console.log("Connected to server!");
+        });
+
+        btn.onclick = () => {
+            console.log("Button clicked! Getting location...");
+            navigator.geolocation.getCurrentPosition((pos) => {
+                const data = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                console.log("Sending SOS:", data);
+                socket.emit('sos-signal', data);
+            });
+        };
+
+        socket.on('volunteer-alert', (data) => {
+            console.log("ALERT RECEIVED FROM SERVER:", data);
+            box.style.display = 'block';
+            document.getElementById('location-text').innerText = "Lat: " + data.lat + " | Lng: " + data.lng;
+        });
+    </script>
+</body>
+
+</html>
