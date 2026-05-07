@@ -5,6 +5,8 @@
     <title>SwiftResponse Pro</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         body {
@@ -41,6 +43,31 @@
         .sos-btn:hover {
             background: #c0392b;
         }
+
+        .volunteer-btn {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 10px;
+            width: 100%;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .volunteer-btn:hover {
+            background: #229954;
+        }
+
+        .route-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            margin-top: 5px;
+        }
     </style>
 </head>
 
@@ -48,6 +75,7 @@
     <div id="sidebar">
         <h2>Emergency Solver</h2>
         <button class="sos-btn" id="sos-trigger">BROADCAST SOS</button>
+        <button class="volunteer-btn" id="volunteer-trigger">REGISTER AS VOLUNTEER</button>
         <div id="status-feed">
             <p>Ready for dispatch...</p>
         </div>
@@ -60,6 +88,22 @@
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         let userMarker;
+        let routingControl;
+        let isVolunteer = false;
+
+        // Register as volunteer
+        document.getElementById('volunteer-trigger').onclick = () => {
+            navigator.geolocation.getCurrentPosition((pos) => {
+                const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                socket.emit('volunteer-register', coords);
+                isVolunteer = true;
+                document.getElementById('volunteer-trigger').innerText = 'VOLUNTEER ACTIVE';
+                document.getElementById('volunteer-trigger').style.background = '#e67e22';
+                map.setView([coords.lat, coords.lng], 15);
+                if (userMarker) map.removeLayer(userMarker);
+                userMarker = L.marker([coords.lat, coords.lng]).addTo(map).bindPopup("<b>Your Location</b>").openPopup();
+            });
+        };
 
         // 1. Send SOS with actual GPS
         document.getElementById('sos-trigger').onclick = () => {
@@ -75,8 +119,31 @@
             const feed = document.getElementById('status-feed');
             feed.innerHTML = `<div style="background:red; padding:10px; margin-top:10px;">⚠️ INCOMING EMERGENCY</div>` + feed.innerHTML;
 
-            L.circle([data.lat, data.lng], { color: 'red', fillColor: '#f03', fillOpacity: 0.5, radius: 500 }).addTo(map);
-            L.marker([data.lat, data.lng]).addTo(map).bindPopup("<b>Victim Location</b>").openPopup();
+            const emergencyMarker = L.circle([data.lat, data.lng], { color: 'red', fillColor: '#f03', fillOpacity: 0.5, radius: 500 }).addTo(map);
+            const marker = L.marker([data.lat, data.lng]).addTo(map).bindPopup("<b>Victim Location</b>").openPopup();
+
+            // If volunteer, show route button
+            if (isVolunteer) {
+                const routeBtn = document.createElement('button');
+                routeBtn.className = 'route-btn';
+                routeBtn.innerText = 'Get Fastest Route';
+                routeBtn.onclick = () => {
+                    navigator.geolocation.getCurrentPosition((pos) => {
+                        const volCoords = [pos.coords.latitude, pos.coords.longitude];
+                        const emergencyCoords = [data.lat, data.lng];
+                        if (routingControl) map.removeControl(routingControl);
+                        routingControl = L.Routing.control({
+                            waypoints: [
+                                L.latLng(volCoords[0], volCoords[1]),
+                                L.latLng(emergencyCoords[0], emergencyCoords[1])
+                            ],
+                            routeWhileDragging: false,
+                            createMarker: () => null // No markers on route
+                        }).addTo(map);
+                    });
+                };
+                marker.bindPopup(`<b>Victim Location</b><br>${routeBtn.outerHTML}`).openPopup();
+            }
         });
     </script>
 </body>
