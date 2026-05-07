@@ -2,65 +2,81 @@
 <html>
 
 <head>
-    <title>Emergency Solver</title>
+    <title>SwiftResponse Pro</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         body {
-            text-align: center;
-            font-family: sans-serif;
-            padding: 50px;
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            height: 100vh;
         }
 
-        #sos-btn {
-            background: red;
+        #sidebar {
+            width: 300px;
+            background: #2c3e50;
             color: white;
-            padding: 40px;
-            font-size: 25px;
-            border-radius: 50%;
-            cursor: pointer;
+            padding: 20px;
+            z-index: 1000;
         }
 
-        #alert-box {
-            display: none;
-            background: yellow;
-            padding: 20px;
-            margin-top: 20px;
-            border: 2px solid black;
+        #map {
+            flex-grow: 1;
+            height: 100%;
+        }
+
+        .sos-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 15px;
+            width: 100%;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .sos-btn:hover {
+            background: #c0392b;
         }
     </style>
 </head>
 
 <body>
-    <h1>Emergency Response Solver</h1>
-    <button id="sos-btn">SEND SOS</button>
-
-    <div id="alert-box" id="alert-box">
-        <h2>⚠️ EMERGENCY ALERT RECEIVED!</h2>
-        <p id="location-text"></p>
+    <div id="sidebar">
+        <h2>Emergency Solver</h2>
+        <button class="sos-btn" id="sos-trigger">BROADCAST SOS</button>
+        <div id="status-feed">
+            <p>Ready for dispatch...</p>
+        </div>
     </div>
+    <div id="map"></div>
 
     <script>
         const socket = io();
-        const btn = document.getElementById('sos-btn');
-        const box = document.getElementById('alert-box');
+        const map = L.map('map').setView([0, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-        socket.on('connect', () => {
-            console.log("Connected to server!");
-        });
+        let userMarker;
 
-        btn.onclick = () => {
-            console.log("Button clicked! Getting location...");
+        // 1. Send SOS with actual GPS
+        document.getElementById('sos-trigger').onclick = () => {
             navigator.geolocation.getCurrentPosition((pos) => {
-                const data = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                console.log("Sending SOS:", data);
-                socket.emit('sos-signal', data);
+                const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                socket.emit('sos-signal', coords);
+                map.setView([coords.lat, coords.lng], 15);
             });
         };
 
+        // 2. Receive SOS and mark it on the Map
         socket.on('volunteer-alert', (data) => {
-            console.log("ALERT RECEIVED FROM SERVER:", data);
-            box.style.display = 'block';
-            document.getElementById('location-text').innerText = "Lat: " + data.lat + " | Lng: " + data.lng;
+            const feed = document.getElementById('status-feed');
+            feed.innerHTML = `<div style="background:red; padding:10px; margin-top:10px;">⚠️ INCOMING EMERGENCY</div>` + feed.innerHTML;
+
+            L.circle([data.lat, data.lng], { color: 'red', fillColor: '#f03', fillOpacity: 0.5, radius: 500 }).addTo(map);
+            L.marker([data.lat, data.lng]).addTo(map).bindPopup("<b>Victim Location</b>").openPopup();
         });
     </script>
 </body>

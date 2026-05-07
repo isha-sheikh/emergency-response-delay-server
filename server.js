@@ -9,15 +9,22 @@ const io = new Server(server);
 app.use(express.static(__dirname));
 
 io.on('connection', (socket) => {
-    console.log('User connected: ' + socket.id);
+    console.log(`📡 New Node Connected: ${socket.id}`);
 
     socket.on('sos-signal', (data) => {
-        console.log('SOS Received from client:', data);
-        // This sends to EVERYONE including the sender for testing
-        io.emit('volunteer-alert', data);
+        const timestamp = new Date().toLocaleTimeString();
+        console.log(`🚨 [${timestamp}] SOS Received at ${data.lat}, ${data.lng}`);
+
+        // Broadcast to EVERYONE connected
+        io.emit('volunteer-alert', {
+            ...data,
+            time: timestamp,
+            id: socket.id
+        });
     });
 });
 
-server.listen(3000, () => {
-    console.log('✅ Server is LIVE on http://localhost:3000');
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`✅ Advanced Emergency Server Active on Port ${PORT}`);
 });
